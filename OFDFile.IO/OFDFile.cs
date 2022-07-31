@@ -12,6 +12,9 @@ namespace OFDFile.IO
         /// </summary>
         public OFDFileHeader FileHeader { get; private set; }
 
+        /// <summary>
+        ///  文件字段个数
+        /// </summary>
         public int FieldCount { get; private set; }
 
         /// <summary>
@@ -21,6 +24,9 @@ namespace OFDFile.IO
 
         private Dictionary<string, int> FieldIndexDict = new Dictionary<string, int>();
 
+        /// <summary>
+        /// 文件数据行数
+        /// </summary>
         public int RowCount { get; private set; }
 
         /// <summary>
@@ -35,6 +41,12 @@ namespace OFDFile.IO
         /// </summary>
         public List<object[]> Datas { get { return LazyDatas.Value; } }
 
+        /// <summary>
+        /// 设置一个委托，可以替换每行数据的读取方法，默认为OFDFileReader.DeserilizeRowData
+        /// 最快是OFDFileFastReader.DeserilizeRowData2
+        /// </summary>
+        public Func<List<OFDFieldInfo>, byte[], object[]> DeserilizeRowDataFunc = OFDFileReader.DeserilizeRowData;
+
         public OFDFile(OFDFileHeader header, List<OFDFieldInfo> fieldInfos, List<byte[]> datas)
         {
             FileHeader = header;
@@ -43,7 +55,24 @@ namespace OFDFile.IO
             RawDatas = datas;
             RowCount = datas.Count;
 
-            LazyDatas = new Lazy<List<object[]>>(() => { return RawDatas.Select(data => OFDFileReader.DeserilizeRowData(FieldInfos, data)).ToList(); }, LazyThreadSafetyMode.ExecutionAndPublication);
+            LazyDatas = new Lazy<List<object[]>>(() =>
+            {
+                var retList = new List<object[]>();
+                int i = 0;
+                try
+                {
+                    for (i = 0; i < RawDatas.Count; i++)
+                    {
+                        retList.Add(DeserilizeRowDataFunc(FieldInfos, RawDatas[i]));
+                    }
+                    return retList;
+                }
+                catch (Exception e)
+                {
+                    int rownum = i + 10 + FieldCount + 1 + 1;
+                    throw new Exception("第" + rownum + "行异常，" + e.Message, e);
+                }
+            }, LazyThreadSafetyMode.ExecutionAndPublication);
 
             for (int i = 0; i < FieldCount; i++)
             {

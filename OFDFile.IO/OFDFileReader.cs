@@ -8,7 +8,7 @@ namespace OFDFile.IO
     public class OFDFileReader : IOBase
     {
 
-        public OFDFileReader()
+        public OFDFileReader() : base()
         {
 
         }
@@ -84,25 +84,32 @@ namespace OFDFile.IO
             {
                 var proerty = fieldProerties[j];
                 byte[] tempBuffer;
-                if (proerty.FieldType == "TEXT" || proerty.FieldSize == OFDFieldInfo.STRING_MAX_LENGTH)
+                try
                 {
-                    tempBuffer = new byte[content.Length - index];
-                    Array.Copy(content, index, tempBuffer, 0, tempBuffer.Length);
-                    dataArray[j] = GBEncoding.GetString(tempBuffer);
-                    break;
+                    if (proerty.FieldType == "TEXT" || proerty.FieldSize == OFDFieldInfo.STRING_MAX_LENGTH)
+                    {
+                        tempBuffer = new byte[content.Length - index];
+                        Array.Copy(content, index, tempBuffer, 0, tempBuffer.Length);
+                        dataArray[j] = GBEncoding.GetString(tempBuffer);
+                        break;
+                    }
+                    if (proerty.FieldType == "N")
+                    {
+                        int intSize = proerty.FieldSize - proerty.FieldSize2;
+                        string value = GBEncoding.GetString(content, index, proerty.FieldSize).Insert(intSize, ".");
+                        dataArray[j] = Convert.ToDecimal(value);
+                    }
+                    else
+                    {
+                        string value = GBEncoding.GetString(content, index, proerty.FieldSize);
+                        dataArray[j] = value.Trim();
+                    }
+                    index += proerty.FieldSize;
                 }
-                if (proerty.FieldType == "N")
+                catch (Exception ex)
                 {
-                    int intSize = proerty.FieldSize - proerty.FieldSize2;
-                    string value = GBEncoding.GetString(content, index, proerty.FieldSize).Insert(intSize, ".");
-                    dataArray[j] = Convert.ToDecimal(value);
+                    throw new Exception($"{j}列，字段名={proerty.FieldName}，一行内容={GBEncoding.GetString(content)}，字段范围内容={GBEncoding.GetString(content, index, proerty.FieldSize)}", ex);
                 }
-                else
-                {
-                    string value = GBEncoding.GetString(content, index, proerty.FieldSize);
-                    dataArray[j] = value.Trim();
-                }
-                index += proerty.FieldSize;
             }
             return dataArray;
         }

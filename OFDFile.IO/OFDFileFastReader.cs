@@ -13,7 +13,7 @@ namespace OFDFile.IO
         private static byte B_Blank = 32;
         private static char C_Blank = (char)32;
 
-        public OFDFileFastReader()
+        public OFDFileFastReader() : base()
         {
 
         }
@@ -165,43 +165,50 @@ namespace OFDFile.IO
             {
                 var proerty = fieldProerties[j];
                 byte[] tempBuffer;
-                if (proerty.FieldType == "TEXT" || proerty.FieldSize == OFDFieldInfo.STRING_MAX_LENGTH)
+                try
                 {
-                    tempBuffer = new byte[content.Length - index];
-                    Array.Copy(content, index, tempBuffer, 0, tempBuffer.Length);
-                    dataArray[j] = GBEncoding.GetString(tempBuffer);
-                    break;
-                }
-                if (proerty.FieldType == "N")
-                {
-                    //数字长度大于18，会超过long的上限
-                    if (proerty.FieldSize > 16)
+                    if (proerty.FieldType == "TEXT" || proerty.FieldSize == OFDFieldInfo.STRING_MAX_LENGTH)
                     {
-                        int intSize = proerty.FieldSize - proerty.FieldSize2;
-                        string value = GBEncoding.GetString(content, index, proerty.FieldSize).Insert(intSize, ".");
-                        dataArray[j] = Convert.ToDecimal(value);
+                        tempBuffer = new byte[content.Length - index];
+                        Array.Copy(content, index, tempBuffer, 0, tempBuffer.Length);
+                        dataArray[j] = GBEncoding.GetString(tempBuffer);
+                        break;
                     }
-                    else
+                    if (proerty.FieldType == "N")
                     {
-                        if (proerty.FieldSize2 == 0)
+                        //数字长度大于18，会超过long的上限
+                        if (proerty.FieldSize > 16)
                         {
-                            dataArray[j] = (decimal)Convert.ToInt64(FastByte2Long(content, index, proerty.FieldSize));
+                            int intSize = proerty.FieldSize - proerty.FieldSize2;
+                            string value = GBEncoding.GetString(content, index, proerty.FieldSize).Insert(intSize, ".");
+                            dataArray[j] = Convert.ToDecimal(value);
                         }
                         else
                         {
-                            long tmpnum = Convert.ToInt64(FastByte2Long(content, index, proerty.FieldSize));
-                            int low = (int)(tmpnum & uint.MaxValue);
-                            int hi = (int)(tmpnum >> 32);
-                            dataArray[j] = new decimal(low, hi, 0, false, (byte)proerty.FieldSize2);
+                            if (proerty.FieldSize2 == 0)
+                            {
+                                dataArray[j] = (decimal)Convert.ToInt64(FastByte2Long(content, index, proerty.FieldSize));
+                            }
+                            else
+                            {
+                                long tmpnum = Convert.ToInt64(FastByte2Long(content, index, proerty.FieldSize));
+                                int low = (int)(tmpnum & uint.MaxValue);
+                                int hi = (int)(tmpnum >> 32);
+                                dataArray[j] = new decimal(low, hi, 0, false, (byte)proerty.FieldSize2);
+                            }
                         }
                     }
+                    else
+                    {
+                        string value = GBEncoding.GetString(content, index, proerty.FieldSize);
+                        dataArray[j] = value.Trim();
+                    }
+                    index += proerty.FieldSize;
                 }
-                else
+                catch (Exception ex)
                 {
-                    string value = GBEncoding.GetString(content, index, proerty.FieldSize);
-                    dataArray[j] = value.Trim();
+                    throw new Exception($"{j}列，字段名={proerty.FieldName}，一行内容={GBEncoding.GetString(content)}，字段范围内容={GBEncoding.GetString(content, index, proerty.FieldSize)}", ex);
                 }
-                index += proerty.FieldSize;
             }
             return dataArray;
         }
@@ -214,45 +221,52 @@ namespace OFDFile.IO
             {
                 var proerty = fieldProerties[j];
                 byte[] tempBuffer;
-                if (proerty.FieldType == "TEXT" || proerty.FieldSize == OFDFieldInfo.STRING_MAX_LENGTH)
+                try
                 {
-                    tempBuffer = new byte[content.Length - index];
-                    Array.Copy(content, index, tempBuffer, 0, tempBuffer.Length);
-                    dataArray[j] = GBEncoding.GetString(tempBuffer).Trim();
-                    break;
-                }
-                if (proerty.FieldType == "N")
-                {
-                    //数字长度大于18，会超过long的上限
-                    if (proerty.FieldSize > 16)
+                    if (proerty.FieldType == "TEXT" || proerty.FieldSize == OFDFieldInfo.STRING_MAX_LENGTH)
                     {
-                        int intSize = proerty.FieldSize - proerty.FieldSize2;
-                        string value = FastReadASCII(content, index, proerty.FieldSize).Insert(intSize, ".");
-                        dataArray[j] = Convert.ToDecimal(value);
+                        tempBuffer = new byte[content.Length - index];
+                        Array.Copy(content, index, tempBuffer, 0, tempBuffer.Length);
+                        dataArray[j] = GBEncoding.GetString(tempBuffer).Trim();
+                        break;
                     }
-                    else
+                    if (proerty.FieldType == "N")
                     {
-                        if (proerty.FieldSize2 == 0)
+                        //数字长度大于18，会超过long的上限
+                        if (proerty.FieldSize > 16)
                         {
-                            dataArray[j] = (decimal)FastByte2Long(content, index, proerty.FieldSize);
+                            int intSize = proerty.FieldSize - proerty.FieldSize2;
+                            string value = FastReadASCII(content, index, proerty.FieldSize).Insert(intSize, ".");
+                            dataArray[j] = Convert.ToDecimal(value);
                         }
                         else
                         {
-                            dataArray[j] = FastByte2Decimal(content, index, proerty.FieldSize, proerty.FieldSize2);
+                            if (proerty.FieldSize2 == 0)
+                            {
+                                dataArray[j] = (decimal)FastByte2Long(content, index, proerty.FieldSize);
+                            }
+                            else
+                            {
+                                dataArray[j] = FastByte2Decimal(content, index, proerty.FieldSize, proerty.FieldSize2);
+                            }
                         }
                     }
+                    else if (proerty.FieldType == "A")
+                    {
+                        string value = FastReadASCII(content, index, proerty.FieldSize).Trim();
+                        dataArray[j] = value;
+                    }
+                    else
+                    {
+                        string value = FastReadGB18030(content, index, proerty.FieldSize).Trim();
+                        dataArray[j] = value;
+                    }
+                    index += proerty.FieldSize;
                 }
-                else if (proerty.FieldType == "A")
+                catch (Exception ex)
                 {
-                    string value = FastReadASCII(content, index, proerty.FieldSize);
-                    dataArray[j] = value.Trim();
+                    throw new Exception($"{j}列，字段名={proerty.FieldName}，一行内容={GBEncoding.GetString(content)}，字段范围内容={GBEncoding.GetString(content, index, proerty.FieldSize)}", ex);
                 }
-                else
-                {
-                    string value = FastReadGB18030(content, index, proerty.FieldSize).Trim();
-                    dataArray[j] = value;
-                }
-                index += proerty.FieldSize;
             }
             return dataArray;
         }

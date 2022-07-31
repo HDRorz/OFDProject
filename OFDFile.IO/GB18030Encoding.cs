@@ -32,7 +32,7 @@ namespace OFDFile.IO
                      * byte1 30-39:10
                      * byte2 81-FE:126
                      * byte3 30-39:10
-                     * 4字节压缩2字节
+                     * 4字节压缩3字节
                     */
                     uint b0 = gb18030code >> 24 & 0xFF;
                     uint b1 = gb18030code >> 16 & 0xFF;
